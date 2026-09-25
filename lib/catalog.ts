@@ -196,24 +196,60 @@ export async function saveSettings(actor: AuthUser | null, input: Omit<SettingsR
   return { ok: true };
 }
 
-export async function listClients() {
-  const rows = await getDb()
-    .select({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      createdAt: user.createdAt,
-      bookingCount: sql<number>`count(${bookings.id})::int`,
-      lastVisit: sql<Date | null>`max(${bookings.startAt})`,
-      lifetimeCents: sql<number>`coalesce(sum(${bookings.priceCents}) filter (where ${bookings.status} = 'completed'), 0)::int`,
-    })
-    .from(user)
-    .leftJoin(bookings, eq(bookings.clientId, user.id))
-    .where(eq(user.role, "client"))
-    .groupBy(user.id)
-    .orderBy(user.name);
-  return rows;
+export function lastAttendedVisit(
+  visits: readonly { startAt: Date; status: string }[],
+  now: Date,
+): Date | null {
+  const cutoff = now.getTime();
+  let latest: Date | null = null;
+  for (const visit of visits) {
+    if (visit.status !== "completed") continue;
+    const start = visit.startAt.getTime();
+    if (Number.isNaN(start) || start >= cutoff) continue;
+    if (!latest || start > latest.getTime()) latest = visit.startAt;
+  }
+  return latest;
+}
+
+export async function listClients(now = new Date()) {
+  const db = getDb();
+  const [rows, visitRows] = await Promise.all([
+    db
+      .select({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        createdAt: user.createdAt,
+        bookingCount: sql<number>`count(${bookings.id})::int`,
+        lifetimeCents: sql<number>`coalesce(sum(${bookings.priceCents}) filter (where ${bookings.status} = 'completed'), 0)::int`,
+      })
+      .from(user)
+      .leftJoin(bookings, eq(bookings.clientId, user.id))
+      .where(eq(user.role, "client"))
+      .groupBy(user.id)
+      .orderBy(user.name),
+    db
+      .select({
+        clientId: bookings.clientId,
+        startAt: bookings.startAt,
+        status: bookings.status,
+      })
+      .from(bookings),
+  ]);
+
+  const visitsByClient = new Map<string, { startAt: Date; status: string }[]>();
+  for (const visit of visitRows) {
+    const stamp = { startAt: visit.startAt, status: visit.status };
+    const list = visitsByClient.get(visit.clientId);
+    if (list) list.push(stamp);
+    else visitsByClient.set(visit.clientId, [stamp]);
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    lastVisit: lastAttendedVisit(visitsByClient.get(row.id) ?? [], now),
+  }));
 }
 
 export async function getClientDetail(id: string) {
