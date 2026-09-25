@@ -4,11 +4,9 @@ Online booking and a client portal for small clinics and studios, with an admin 
 
 **Portfolio concept project by Sameer Zaman. Cedar Physio & Wellness is fictional; all data is generated.**
 
-**Live demo:** [LIVE_DEMO_URL](LIVE_DEMO_URL)
+**Live demo:** [bookwell-hazel.vercel.app](https://bookwell-hazel.vercel.app)
 
 Use the Try demo as admin / Try demo as client buttons. Data resets nightly.
-
-<!-- TODO: replace after deploy -->
 
 ![Admin dashboard](docs/screenshot-admin.png)
 
