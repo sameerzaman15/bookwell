@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: bookwell
+      POSTGRES_PASSWORD: bookwell
+      POSTGRES_DB: bookwell
+    ports:
+      - "5432:5432"
+    volumes:
+      - bookwell_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bookwell -d bookwell"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  bookwell_pg:
