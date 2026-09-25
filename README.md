@@ -113,14 +113,30 @@ If you already have Postgres, point `DATABASE_URL` and `DATABASE_URL_UNPOOLED` a
 
 ## Deploy
 
+Deploy from the Vercel website. No terminal is required. Leave the build command as it is in the repo (`pnpm vercel-build`).
+
 1. Import this repo into Vercel.
 2. Add Neon from the Vercel Marketplace (Storage tab). That sets `DATABASE_URL` and `DATABASE_URL_UNPOOLED`.
-3. Set the remaining env vars from the table below. Use the production URL for `BETTER_AUTH_URL` and `NEXT_PUBLIC_APP_URL`.
-4. Run `pnpm db:setup` once against Neon, using `DATABASE_URL_UNPOOLED` (the setup script prefers that URL for migrations).
-5. Redeploy.
-6. Confirm the cron is listed. `vercel.json` calls `/api/cron/reset-demo` once a day. Vercel sends `Authorization: Bearer $CRON_SECRET`.
+3. Set the env vars below by hand. Generate each secret with a password generator, 32 characters or more.
+4. Deploy. The build migrates, then runs the same idempotent seed as `pnpm db:setup`, then builds the app. If no database URL is present, that step logs a skip line and the build continues.
+5. Confirm the cron is listed. `vercel.json` calls `/api/cron/reset-demo` once a day. Vercel sends `Authorization: Bearer $CRON_SECRET`.
 
-Do not enter real personal or health information. This is a shared demo and the database is reset every night.
+Every deploy recreates the demo clinic (the same tables the nightly reset clears). Do not enter real personal or health information.
+
+Set these after Neon is connected:
+
+| Name | How to choose it |
+|---|---|
+| `BETTER_AUTH_SECRET` | Password generator, 32+ characters |
+| `BETTER_AUTH_URL` | The site URL, such as `https://bookwell-demo.vercel.app` |
+| `NEXT_PUBLIC_APP_URL` | The same URL as `BETTER_AUTH_URL` |
+| `DEMO_ADMIN_EMAIL` | `admin@demo.bookwell.app` |
+| `DEMO_ADMIN_PASSWORD` | Password generator, 32+ characters. Server-side only |
+| `DEMO_CLIENT_EMAIL` | `client@demo.bookwell.app` |
+| `DEMO_CLIENT_PASSWORD` | A different password, 32+ characters. Server-side only |
+| `CRON_SECRET` | Password generator, 32+ characters |
+
+`BUSINESS_TIMEZONE` is optional. When you leave it unset, the clinic uses `America/New_York` (US Eastern) for hours and displayed times. Set another IANA name, such as `America/Chicago`, only if you want a different zone. `DEMO_MODE` is optional and defaults to on, which shows Reset demo data now. The demo banner stays on either way.
 
 ## Env vars
 
@@ -136,7 +152,7 @@ Do not enter real personal or health information. This is a shared demo and the 
 | `DEMO_CLIENT_EMAIL` | Yes | `client@demo.bookwell.app` | Seeded demo client |
 | `DEMO_CLIENT_PASSWORD` | Yes | random | Server-side only |
 | `CRON_SECRET` | Yes | random | Protects `/api/cron/reset-demo` |
-| `BUSINESS_TIMEZONE` | No | `America/New_York` | Default for the settings row |
+| `BUSINESS_TIMEZONE` | No | `America/New_York` | Optional IANA zone. When omitted or invalid, hours and displayed times use America/New_York (US Eastern) |
 | `DEMO_MODE` | No | `true` | Shows the reset control. The demo banner is always on |
 
 ## Testing
@@ -150,7 +166,7 @@ pnpm typecheck
 pnpm build
 ```
 
-`pnpm test` covers the availability engine and auth helpers and does not need a database. `pnpm test:db` needs Postgres and checks the seed, signup role, the overlap constraint, the cancellation window, and the cron secret. `pnpm test:e2e` signs in as both demo roles, checks the dashboard, and books, reschedules, and cancels a visit. `pnpm build` does not query the database.
+`pnpm test` covers the availability engine and auth helpers and does not need a database. `pnpm test:db` needs Postgres and checks the seed, signup role, the overlap constraint, the cancellation window, and the cron secret. `pnpm test:e2e` signs in as both demo roles, checks the dashboard, and books, reschedules, and cancels a visit. `pnpm build` does not query the database. `pnpm vercel-build` is what Vercel runs: it migrates and seeds when `DATABASE_URL_UNPOOLED` or `DATABASE_URL` is set, and otherwise logs a skip line before `next build`.
 
 GitHub Actions runs typecheck, lint, unit tests, `pnpm db:setup`, database tests, and Playwright against a Postgres 16 service container.
 
@@ -163,7 +179,7 @@ db/             Drizzle schema and seed
 drizzle/        SQL migrations, including the exclusion constraint
 lib/            auth, availability, booking rules, actions
 e2e/            Playwright smoke tests
-scripts/        migrate, setup, screenshots
+scripts/        migrate, setup, vercel-build, screenshots
 ```
 
 Built by [Sameer Zaman](https://sameer-zaman.vercel.app), available for MVP and full-stack work.

@@ -45,7 +45,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Production build without a database
-        run: pnpm build
+        run: pnpm vercel-build
         env:
           DATABASE_URL: ""
           DATABASE_URL_UNPOOLED: ""
