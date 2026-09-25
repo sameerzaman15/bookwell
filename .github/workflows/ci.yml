@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bookwell
+          POSTGRES_PASSWORD: bookwell
+          POSTGRES_DB: bookwell
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bookwell -d bookwell"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://bookwell:bookwell@127.0.0.1:5432/bookwell
+      DATABASE_URL_UNPOOLED: postgresql://bookwell:bookwell@127.0.0.1:5432/bookwell
+      BETTER_AUTH_SECRET: ci-better-auth-secret-must-be-32b
+      BETTER_AUTH_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      DEMO_ADMIN_EMAIL: admin@demo.bookwell.app
+      DEMO_ADMIN_PASSWORD: ci-admin-pass-123
+      DEMO_CLIENT_EMAIL: client@demo.bookwell.app
+      DEMO_CLIENT_PASSWORD: ci-client-pass-123
+      CRON_SECRET: ci-cron-secret
+      BUSINESS_TIMEZONE: America/New_York
+      DEMO_MODE: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Production build without a database
+        run: pnpm build
+        env:
+          DATABASE_URL: ""
+          DATABASE_URL_UNPOOLED: ""
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm db:setup
+      - run: pnpm test:db
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
